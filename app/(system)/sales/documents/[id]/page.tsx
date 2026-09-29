@@ -1,0 +1,5 @@
+import {formatQuantity} from '@/lib/quantity-display';
+import {requireUser} from '@/lib/auth';
+import {saleDocumentData} from '@/lib/sales-read';
+import type {Row} from '@/lib/sales-common';
+export default async function Page({params}:{params:Promise<{id:string}>}){const data=await saleDocumentData(await requireUser(),(await params).id);return <section className="panel"><h1>{data.document.kind==='SI'?'Sales Invoice':'Delivery Receipt'} {data.document.number}</h1><p className="notice">Reference preview. Official pre-printed forms require physical measurements and print alignment verification before use.</p><p>{data.sale_number} · {data.customer.name}</p><p>{data.customer.billing_address}</p><table><thead><tr><th>Product</th><th>Quantity</th>{data.document.kind==='SI'&&<th>Customer payable</th>}</tr></thead><tbody>{data.lines.map((l:Row,i:number)=><tr key={i}><td>{l.product_name}</td><td>{formatQuantity(l.quantity)} {l.uom}</td>{data.document.kind==='SI'&&<td>₱{Number(l.gross_amount).toFixed(2)}</td>}</tr>)}</tbody></table>{data.gross_total&&<p>Total: ₱{Number(data.gross_total).toFixed(2)}</p>}</section>;}

@@ -1,0 +1,7 @@
+'use client';
+import {useState} from 'react';
+export default function ProductPriceLists({units,primary,record}:{units:string[];primary:string;record?:Record<string,any>}){
+ const [prices,setPrices]=useState<Record<string,{Retail:string;Contractor:string}>>(()=>({...record?.selling_prices,[String(record?.primary_uom||primary)]:record?.selling_prices?.[String(record?.primary_uom||primary)]||{Retail:String(record?.retail_price??'0'),Contractor:String(record?.contractor_price??'0')}}));
+ const current=Object.fromEntries(units.filter(Boolean).map(u=>[u,prices[u]||{Retail:u==='METER'?String(record?.meter_price??''):'',Contractor:''}]));
+ return <fieldset className="panel"><legend>Selling price lists</legend><input type="hidden" name="selling_prices" value={JSON.stringify(current)}/><input type="hidden" name="retail_price" value={current[primary]?.Retail||'0'}/><input type="hidden" name="contractor_price" value={current[primary]?.Contractor||'0'}/><table><thead><tr><th>UOM</th><th>Retail Price</th><th>Contractor Price</th></tr></thead><tbody>{Object.entries(current).map(([u,v])=><tr key={u}><td>{u}</td>{(['Retail','Contractor'] as const).map(list=><td key={list}><input aria-label={u+' '+list+' Price'} required inputMode="decimal" value={v[list]} onChange={e=>setPrices({...prices,[u]:{...v,[list]:e.target.value}})}/></td>)}</tr>)}</tbody></table><small>Each price is independently maintained. No VAT calculations or automatic cross-list pricing.</small></fieldset>;
+}

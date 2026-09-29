@@ -1,0 +1,1 @@
+import DocumentWorkspacePage from '@/components/document-workspace-page';export default function Page({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){return <DocumentWorkspacePage kind="DR" searchParams={searchParams}/>;}

@@ -1,0 +1,2 @@
+import {requireUser} from '@/lib/auth';
+export default async function Page(){const actor=await requireUser();if(!actor.roles.includes('PRESIDENT_ADMIN'))return <h1>Access restricted</h1>;return <><h1>Operational pricing</h1><p>Entered amounts are used unchanged. VAT never changes operational prices or totals. Separate Input / Output VAT references are recorded for explicitly inclusive actual transactions. Historical tax records remain preserved for your accountant.</p><a href="/vat-reference">Open Input / Output VAT Reference</a></>;}

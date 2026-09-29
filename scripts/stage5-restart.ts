@@ -1,0 +1,6 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import assert from 'node:assert/strict';
+import {query,closeDB} from '../lib/db';
+async function main(){if(!process.env.LOCAL_DB_PATH?.startsWith('/private/tmp/imperial-stage5-acceptance'))throw new Error('Only use the stopped isolated Stage 5 acceptance database.');const result:Record<string,unknown>={};for(const {table_name:t} of (await query<{table_name:string}>("SELECT table_name FROM information_schema.tables WHERE table_schema='imperial' AND table_type='BASE TABLE' ORDER BY table_name")).rows){if(!/^[a-z_]+$/.test(t))throw new Error('Invalid table');const rows=(await query(`SELECT to_jsonb(t)::text AS data FROM ${t} t ORDER BY to_jsonb(t)::text`)).rows;result[t]={count:rows.length,sha256:createHash('sha256').update(JSON.stringify(rows)).digest('hex')};}const path='test-results/stage5-restart.json';if(process.argv.includes('--record'))await writeFile(path,JSON.stringify(result,null,2),{flag:'wx'});else assert.deepEqual(result,JSON.parse(await readFile(path,'utf8')));console.log('PASS restart snapshot:',Object.fromEntries(Object.entries(result).map(([k,v])=>[k,(v as {count:number}).count])));}
+main().catch(e=>{console.error(e);process.exitCode=1}).finally(closeDB);

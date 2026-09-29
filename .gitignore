@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.env*
+!.env.example
+.local-db/
+*.tsbuildinfo
+test-results/
+.local-test-login
+backups/
+
+# Local caches, recovery archives, and generated reports
+.DS_Store
+.pnpm-store/
+output/
+*.log
+*.pid

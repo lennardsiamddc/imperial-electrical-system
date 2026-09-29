@@ -1,0 +1,2 @@
+'use client';
+export default function VatReferenceSelector({value,onChange,disabled=false}:{value:string;onChange:(v:string)=>void;disabled?:boolean}){return <label className="no-print">Sales VAT reference<select aria-label="Sales VAT reference" value={value} disabled={disabled} onChange={e=>onChange(e.target.value)}><option value="Excluded">VAT Excluded</option><option value="Included">VAT Included</option></select><small>Internal tracking for the entire finalized amount. Prices and customer totals never change.</small></label>;}

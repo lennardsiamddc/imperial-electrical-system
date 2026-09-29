@@ -1,0 +1,3 @@
+import {resolveSession} from '@/lib/sessions';
+import {quotationProductSearch} from '@/lib/quotation-pricing-read';
+export async function GET(request:Request){const headers={'Cache-Control':'private, no-store','Vary':'Cookie'};try{const token=request.headers.get('cookie')?.split(';').map(s=>s.trim()).find(s=>s.startsWith('imperial_session='))?.slice(17);const actor=token?await resolveSession(token):null;if(!actor)return Response.json({error:'Authentication required'},{status:401,headers});return Response.json({data:await quotationProductSearch(actor,new URL(request.url).searchParams.get('q')||'')},{headers});}catch{return Response.json({error:'Quotation product access restricted'},{status:403,headers});}}

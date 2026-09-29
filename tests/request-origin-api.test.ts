@@ -1,0 +1,37 @@
+import {test,after} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {randomUUID} from 'node:crypto';
+import {migrate} from '../lib/migrations';
+import {query,transaction,closeDB} from '../lib/db';
+import {hashPassword} from '../lib/password';
+import {saveMaster} from '../lib/masters';
+import {authenticate} from '../lib/sessions';
+import {stamp} from '../lib/sales-common';
+import {salesResponse} from '../lib/sales-api';
+import {returnsResponse} from '../lib/returns-api';
+import type {Actor} from '../lib/permissions';
+let directory:string;
+after(async()=>{await closeDB();if(directory)await rm(directory,{recursive:true,force:true});});
+test('Authenticated public-host regression: save/replay, settings, Returns and forged origins',async()=>{
+ delete process.env.DATABASE_URL;directory=await mkdtemp(join(tmpdir(),'imperial-origin-'));process.env.LOCAL_DB_PATH=directory;await migrate();
+ const owner:Actor={id:randomUUID(),name:'TEST Origin Owner',email:'origin@example.test',roles:['PRESIDENT_ADMIN']},password='TEST origin password long';
+ await transaction(async db=>{await stamp(db,owner);await db.query('INSERT INTO users(id,name,email,password_hash,roles) VALUES($1,$2,$3,$4,$5)',[owner.id,owner.name,owner.email,await hashPassword(password),owner.roles]);});
+ const pid=await saveMaster(owner,'products',{sku:'TEST-S3-BASE',name:'TEST Sale Breaker',brand:'TEST',category:'Breaker',primary_uom:'PCS',secondary_uom:'',conversion:'',base_price:'500',supplier_adjustment:'0',standard_cost:'500',vat_status:'VAT',vat_rate:'0.12',retail_price:'700',contractor_price:'700',wholesale_price:'700',meter_price:'0',reorder_level:'1',supplier_id:'',notes:'TEST ONLY',active:true});
+ const token=await authenticate(owner.email,password);
+ const req=(path:string,body:unknown,origin='http://127.0.0.1:3000',method='POST')=>new Request('http://localhost:3000/api/'+path,{method,headers:{host:'127.0.0.1:3000',origin,cookie:'imperial_session='+token,'x-forwarded-host':'127.0.0.1:3000'},body:JSON.stringify(body)});
+ const body={operation:'save',data:{request_id:randomUUID(),channel:'Retail',occurred_at:'2026-02-01T00:00:00Z',terms:'Cash',tax_config_version:1,lines:[{id:randomUUID(),product_id:pid,quantity:'1',uom:'PCS',price:'700',vat_mode:'VAT Exclusive',tax_treatment:'VATable',discount:'0'}]}};
+ const auditBefore=(await query('SELECT count(*)::int n FROM audit_log')).rows[0].n;
+ for(const origin of ['http://evil.test','http://localhost:3000','http://127.0.0.1:3001','null'])for(const [path,handler] of [['sales',salesResponse],['returns',returnsResponse]] as const){const r=await handler(req(path,body,origin));assert.equal(r.status,403);assert.equal((await r.json()).error,'Invalid request origin');}
+ assert.equal((await query('SELECT count(*)::int n FROM audit_log')).rows[0].n,auditBefore);
+ const results=await Promise.all([salesResponse(req('sales',body)),salesResponse(req('sales',body))]);
+ for(const r of results)assert.equal(r.status,200);const ids=await Promise.all(results.map(r=>r.json()));assert.equal(ids[0].id,ids[1].id);
+ assert.equal((await query('SELECT count(*)::int n FROM sales')).rows[0].n,1);
+ assert.equal((await query('SELECT count(*)::int n FROM sale_lines')).rows[0].n,1);
+ const settings=await salesResponse(req('sales',{operation:'option',data:{kind:'platform',code:'TEST_ORIGIN',name:'TEST Origin Platform',active:true}}));assert.equal(settings.status,200);
+ const cancelled=await returnsResponse(req('returns',{operation:'cancel-draft',data:{id:ids[0].id,request_id:randomUUID(),version:1,reason:'TEST origin verification'}}));assert.equal(cancelled.status,200);
+ for(const method of ['PUT','PATCH','DELETE'])for(const [path,handler] of [['sales',salesResponse],['returns',returnsResponse]] as const)assert.equal((await handler(req(path,body,undefined,method))).status,405);
+ assert(Number((await query('SELECT count(*)::int n FROM audit_log')).rows[0].n)>Number(auditBefore));
+});

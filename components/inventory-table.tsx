@@ -1,0 +1,5 @@
+import Link from 'next/link';
+import {quantityText,moneyText} from '@/lib/format';
+export default function InventoryTable({rows,financial=false,receive=false}:{rows:Record<string,unknown>[];financial?:boolean;receive?:boolean}){
+ return <div className="table-wrap"><table><thead><tr><th>Product</th><th>Available Stock</th><th>Unit</th><th>Status</th>{financial&&<th>Inventory value</th>}<th></th></tr></thead><tbody>{rows.map(r=><tr key={String(r.id)}><td><Link href={`/inventory?product=${r.id}`}>{String(r.name)}</Link><small style={{display:'block'}}>{String(r.sku)}</small></td><td>{quantityText(r.available)}</td><td>{String(r.stock_uom)}</td><td><span className={`badge ${!r.active?'off':r.low_stock?'low-stock':''}`}>{!r.active?'Inactive':r.low_stock?'Low stock':'In stock'}</span></td>{financial&&<td>₱{moneyText(r.inventory_value)}</td>}<td>{Boolean(r.active)&&receive&&<Link href={`/stock-in?product=${r.id}`}>Stock In →</Link>}</td></tr>)}</tbody></table>{!rows.length&&<p className="empty">No matching products. Try another search or filter.</p>}</div>;
+}
